@@ -4,5 +4,5 @@
   "installCommand": "cd Ass2-react && npm ci",
   "buildCommand": "cd Ass2-react && npm run build",
   "outputDirectory": "Ass2-react/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }
