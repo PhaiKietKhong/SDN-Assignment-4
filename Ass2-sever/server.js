@@ -1,6 +1,7 @@
 // sever.js
 import dotenv from "dotenv";
 import express from "express";
+import cors from "cors";
 import connectDB from "./config/db.js";
 
 // Import routes
@@ -15,6 +16,16 @@ const app = express();
 connectDB();
 
 // Middleware
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "https://sdn-assignment-4.vercel.app",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Use routes

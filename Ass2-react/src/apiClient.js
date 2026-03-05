@@ -1,8 +1,19 @@
 import axios from "axios";
 
+const defaultProdApiBaseUrl = "https://sdn-assignment-4-won0.onrender.com";
+
+const apiBaseUrl = import.meta.env.DEV
+  ? "/api"
+  : import.meta.env.VITE_API_BASE_URL || defaultProdApiBaseUrl;
+
+if (import.meta.env.PROD && !apiBaseUrl) {
+  console.error(
+    "Missing VITE_API_BASE_URL. Set it in Vercel to your backend origin.",
+  );
+}
+
 const apiClient = axios.create({
-  // In dev, default to Vite proxy (/api). In production, set VITE_API_BASE_URL.
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: apiBaseUrl,
 });
 
 export default apiClient;
