@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import axios from "axios";
+import apiClient from "../../apiClient";
 
 const tokenFromStorage = localStorage.getItem("token");
 const usernameFromStorage = localStorage.getItem("username");
@@ -18,7 +18,7 @@ export const loginUser = createAsyncThunk(
   async ({ username, password }, { rejectWithValue }) => {
     try {
       const trimmedUsername = username.trim();
-      const { data } = await axios.post("/api/users/login", {
+      const { data } = await apiClient.post("/users/login", {
         username: trimmedUsername,
         password,
       });

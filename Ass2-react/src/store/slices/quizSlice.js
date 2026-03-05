@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import axios from "axios";
+import apiClient from "../../apiClient";
 
 const initialState = {
   quizzes: [],
@@ -14,7 +14,7 @@ export const fetchQuizzes = createAsyncThunk(
   async (_, { getState, rejectWithValue }) => {
     try {
       const token = getState().auth.token;
-      const { data } = await axios.get("/api/quizzes", {
+      const { data } = await apiClient.get("/quizzes", {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       return data;
@@ -31,7 +31,7 @@ export const fetchQuizById = createAsyncThunk(
   async (quizId, { getState, rejectWithValue }) => {
     try {
       const token = getState().auth.token;
-      const { data } = await axios.get(`/api/quizzes/${quizId}`, {
+      const { data } = await apiClient.get(`/quizzes/${quizId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       return data;

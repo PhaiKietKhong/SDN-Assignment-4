@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import apiClient from "../apiClient";
 
 const EMPTY_FORM = {
   text: "",
@@ -36,7 +36,7 @@ function ManageQuestionsPage() {
   const fetchQuizzes = async () => {
     setLoadingQuizzes(true);
     try {
-      const { data } = await axios.get("/api/quizzes");
+      const { data } = await apiClient.get("/quizzes");
       setQuizzes(data);
     } catch {
       setError("Failed to load quizzes.");
@@ -52,7 +52,7 @@ function ManageQuestionsPage() {
     setForm(EMPTY_FORM);
     setEditingId(null);
     try {
-      const { data } = await axios.get(`/api/quizzes/${quizId}`);
+      const { data } = await apiClient.get(`/quizzes/${quizId}`);
       setSelectedQuiz(data);
     } catch {
       setError("Failed to load quiz.");
@@ -64,7 +64,7 @@ function ManageQuestionsPage() {
   /* ── refresh the open quiz ── */
   const refreshQuiz = async () => {
     if (!selectedQuiz) return;
-    const { data } = await axios.get(`/api/quizzes/${selectedQuiz._id}`);
+    const { data } = await apiClient.get(`/quizzes/${selectedQuiz._id}`);
     setSelectedQuiz(data);
   };
 
@@ -104,8 +104,8 @@ function ManageQuestionsPage() {
     try {
       if (editingId) {
         // ── EDIT ──
-        await axios.put(
-          `/api/questions/${editingId}`,
+        await apiClient.put(
+          `/questions/${editingId}`,
           {
             text: form.text.trim(),
             options: form.options.filter((o) => o.trim() !== ""),
@@ -116,8 +116,8 @@ function ManageQuestionsPage() {
         );
       } else {
         // ── ADD ──
-        const { data: newQuestion } = await axios.post(
-          "/api/questions",
+        const { data: newQuestion } = await apiClient.post(
+          "/questions",
           {
             text: form.text.trim(),
             options: form.options.filter((o) => o.trim() !== ""),
@@ -134,8 +134,8 @@ function ManageQuestionsPage() {
           ),
           newQuestion._id,
         ];
-        await axios.put(
-          `/api/quizzes/${selectedQuiz._id}`,
+        await apiClient.put(
+          `/quizzes/${selectedQuiz._id}`,
           { question: updatedQuestionIds },
           { headers: authHeader() },
         );
@@ -178,7 +178,7 @@ function ManageQuestionsPage() {
     if (!window.confirm("Delete this question?")) return;
     setError("");
     try {
-      await axios.delete(`/api/questions/${questionId}`, {
+      await apiClient.delete(`/questions/${questionId}`, {
         headers: authHeader(),
       });
 
@@ -186,8 +186,8 @@ function ManageQuestionsPage() {
       const updatedQuestionIds = (selectedQuiz.question || [])
         .map((q) => (typeof q === "object" ? q._id : q))
         .filter((id) => id !== questionId);
-      await axios.put(
-        `/api/quizzes/${selectedQuiz._id}`,
+      await apiClient.put(
+        `/quizzes/${selectedQuiz._id}`,
         { question: updatedQuestionIds },
         { headers: authHeader() },
       );
