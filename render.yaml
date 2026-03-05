@@ -1,0 +1,27 @@
+services:
+  # Backend - Express.js
+  - type: web
+    name: ass2-sever
+    env: node
+    runtime: node
+    rootDir: Ass2-sever
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: MONGO_URI
+        sync: false # Set this in Render dashboard
+      - key: JWT_SECRET
+        sync: false # Set this in Render dashboard
+      - key: CLIENT_URL
+        value: https://sdn-assignment-4.vercel.app
+
+  # Frontend - Static Site (Vite)
+  - type: static
+    name: ass2-react
+    rootDir: Ass2-react
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    # Vercel handles this, but good for reference
+    # envVars:
+    #   - key: VITE_API_BASE_URL
+    #     value: https://sdn-assignment-4-won0.onrender.com

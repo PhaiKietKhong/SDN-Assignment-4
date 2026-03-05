@@ -8,6 +8,11 @@ const EMPTY_FORM = {
   keyword: [],
 };
 
+const EMPTY_QUIZ_FORM = {
+  title: "",
+  description: "",
+};
+
 function authHeader() {
   const token = localStorage.getItem("token");
   return { Authorization: `Bearer ${token}` };
@@ -21,6 +26,9 @@ function ManageQuestionsPage() {
   const [selectedQuiz, setSelectedQuiz] = useState(null); // full quiz with populated questions
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [quizForm, setQuizForm] = useState(EMPTY_QUIZ_FORM);
+  const [creatingQuiz, setCreatingQuiz] = useState(false);
+  const [quizSuccess, setQuizSuccess] = useState("");
 
   // form state (shared for add & edit)
   const [form, setForm] = useState(EMPTY_FORM);
@@ -49,6 +57,7 @@ function ManageQuestionsPage() {
   const handleSelectQuiz = async (quizId) => {
     setLoadingQuiz(true);
     setError("");
+    setQuizSuccess("");
     setForm(EMPTY_FORM);
     setEditingId(null);
     try {
@@ -204,6 +213,46 @@ function ManageQuestionsPage() {
     setError("");
   };
 
+  /* ── create quiz ── */
+  const handleCreateQuiz = async (e) => {
+    e.preventDefault();
+    setError("");
+    setQuizSuccess("");
+
+    if (!quizForm.title.trim()) {
+      setError("Quiz title is required.");
+      return;
+    }
+
+    setCreatingQuiz(true);
+    try {
+      const payload = {
+        title: quizForm.title.trim(),
+        description: quizForm.description.trim(),
+      };
+
+      const { data: createdQuiz } = await apiClient.post("/quizzes", payload, {
+        headers: authHeader(),
+      });
+
+      setQuizForm(EMPTY_QUIZ_FORM);
+      setQuizSuccess("Quiz created successfully.");
+      await fetchQuizzes();
+
+      if (createdQuiz?._id) {
+        await handleSelectQuiz(createdQuiz._id);
+      }
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to create quiz.",
+      );
+    } finally {
+      setCreatingQuiz(false);
+    }
+  };
+
   /* ─────────────────────────────
      RENDER: Quiz list
   ───────────────────────────── */
@@ -212,6 +261,68 @@ function ManageQuestionsPage() {
       <div className="container mt-4">
         <h2 className="fw-bold mb-4">Manage Questions</h2>
         <p className="text-muted">Select a quiz to manage its questions.</p>
+
+        <div className="card mb-4">
+          <div className="card-header fw-semibold">Create New Quiz</div>
+          <div className="card-body">
+            {error && (
+              <div className="alert alert-danger" role="alert">
+                {error}
+              </div>
+            )}
+            {quizSuccess && (
+              <div className="alert alert-success" role="alert">
+                {quizSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateQuiz}>
+              <div className="mb-3 row">
+                <label className="col-sm-3 col-form-label">Title:</label>
+                <div className="col-sm-9">
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={quizForm.title}
+                    onChange={(e) =>
+                      setQuizForm((prev) => ({
+                        ...prev,
+                        title: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter quiz title"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-3 row">
+                <label className="col-sm-3 col-form-label">Description:</label>
+                <div className="col-sm-9">
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    value={quizForm.description}
+                    onChange={(e) =>
+                      setQuizForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Optional description"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-success"
+                disabled={creatingQuiz}
+              >
+                {creatingQuiz ? "Creating..." : "Create Quiz"}
+              </button>
+            </form>
+          </div>
+        </div>
 
         {loadingQuizzes ? (
           <div className="text-center mt-4">
@@ -258,6 +369,7 @@ function ManageQuestionsPage() {
           onClick={() => {
             setSelectedQuiz(null);
             setForm(EMPTY_FORM);
+            setQuizSuccess("");
             setEditingId(null);
             setError("");
             fetchQuizzes();
