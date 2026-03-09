@@ -27,8 +27,11 @@ function ManageQuestionsPage() {
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
   const [quizForm, setQuizForm] = useState(EMPTY_QUIZ_FORM);
-  const [creatingQuiz, setCreatingQuiz] = useState(false);
-  const [quizSuccess, setQuizSuccess] = useState("");
+  const [quizModalMode, setQuizModalMode] = useState("add");
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showDeleteQuizModal, setShowDeleteQuizModal] = useState(false);
+  const [quizToDelete, setQuizToDelete] = useState(null);
+  const [quizActionLoading, setQuizActionLoading] = useState(false);
 
   // form state (shared for add & edit)
   const [form, setForm] = useState(EMPTY_FORM);
@@ -57,7 +60,6 @@ function ManageQuestionsPage() {
   const handleSelectQuiz = async (quizId) => {
     setLoadingQuiz(true);
     setError("");
-    setQuizSuccess("");
     setForm(EMPTY_FORM);
     setEditingId(null);
     try {
@@ -213,43 +215,102 @@ function ManageQuestionsPage() {
     setError("");
   };
 
-  /* ── create quiz ── */
-  const handleCreateQuiz = async (e) => {
-    e.preventDefault();
+  const openAddQuizModal = () => {
+    setQuizModalMode("add");
+    setQuizForm(EMPTY_QUIZ_FORM);
     setError("");
-    setQuizSuccess("");
+    setShowQuizModal(true);
+  };
+
+  const openEditQuizModal = (quiz) => {
+    setQuizModalMode("edit");
+    setQuizForm({
+      title: quiz.title || "",
+      description: quiz.description || "",
+    });
+    setQuizToDelete(quiz);
+    setError("");
+    setShowQuizModal(true);
+  };
+
+  const closeQuizModal = () => {
+    if (quizActionLoading) return;
+    setShowQuizModal(false);
+    setQuizForm(EMPTY_QUIZ_FORM);
+    setQuizToDelete(null);
+  };
+
+  const handleSaveQuiz = async () => {
+    setError("");
 
     if (!quizForm.title.trim()) {
       setError("Quiz title is required.");
       return;
     }
 
-    setCreatingQuiz(true);
+    setQuizActionLoading(true);
     try {
       const payload = {
         title: quizForm.title.trim(),
         description: quizForm.description.trim(),
       };
 
-      const { data: createdQuiz } = await apiClient.post("/quizzes", payload, {
-        headers: authHeader(),
-      });
-
-      setQuizForm(EMPTY_QUIZ_FORM);
-      setQuizSuccess("Quiz created successfully.");
-      await fetchQuizzes();
-
-      if (createdQuiz?._id) {
-        await handleSelectQuiz(createdQuiz._id);
+      if (quizModalMode === "edit" && quizToDelete?._id) {
+        await apiClient.put(`/quizzes/${quizToDelete._id}`, payload, {
+          headers: authHeader(),
+        });
+      } else {
+        await apiClient.post("/quizzes", payload, {
+          headers: authHeader(),
+        });
       }
+
+      setShowQuizModal(false);
+      setQuizForm(EMPTY_QUIZ_FORM);
+      setQuizToDelete(null);
+      await fetchQuizzes();
     } catch (err) {
       setError(
         err?.response?.data?.error ||
           err?.response?.data?.message ||
-          "Failed to create quiz.",
+          "Failed to save quiz.",
       );
     } finally {
-      setCreatingQuiz(false);
+      setQuizActionLoading(false);
+    }
+  };
+
+  const openDeleteQuizModal = (quiz) => {
+    setQuizToDelete(quiz);
+    setError("");
+    setShowDeleteQuizModal(true);
+  };
+
+  const closeDeleteQuizModal = () => {
+    if (quizActionLoading) return;
+    setShowDeleteQuizModal(false);
+    setQuizToDelete(null);
+  };
+
+  const handleDeleteQuiz = async () => {
+    if (!quizToDelete?._id) return;
+    setError("");
+    setQuizActionLoading(true);
+    try {
+      await apiClient.delete(`/quizzes/${quizToDelete._id}`, {
+        headers: authHeader(),
+      });
+      setShowDeleteQuizModal(false);
+      setQuizToDelete(null);
+      await fetchQuizzes();
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to delete quiz.",
+      );
+    } finally {
+      setQuizActionLoading(false);
     }
   };
 
@@ -259,70 +320,19 @@ function ManageQuestionsPage() {
   if (!selectedQuiz) {
     return (
       <div className="container mt-4">
-        <h2 className="fw-bold mb-4">Manage Questions</h2>
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <h2 className="fw-bold mb-0">Manage Questions</h2>
+          <button className="btn btn-success" onClick={openAddQuizModal}>
+            Add Quiz
+          </button>
+        </div>
         <p className="text-muted">Select a quiz to manage its questions.</p>
 
-        <div className="card mb-4">
-          <div className="card-header fw-semibold">Create New Quiz</div>
-          <div className="card-body">
-            {error && (
-              <div className="alert alert-danger" role="alert">
-                {error}
-              </div>
-            )}
-            {quizSuccess && (
-              <div className="alert alert-success" role="alert">
-                {quizSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateQuiz}>
-              <div className="mb-3 row">
-                <label className="col-sm-3 col-form-label">Title:</label>
-                <div className="col-sm-9">
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={quizForm.title}
-                    onChange={(e) =>
-                      setQuizForm((prev) => ({
-                        ...prev,
-                        title: e.target.value,
-                      }))
-                    }
-                    placeholder="Enter quiz title"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-3 row">
-                <label className="col-sm-3 col-form-label">Description:</label>
-                <div className="col-sm-9">
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    value={quizForm.description}
-                    onChange={(e) =>
-                      setQuizForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    placeholder="Optional description"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-success"
-                disabled={creatingQuiz}
-              >
-                {creatingQuiz ? "Creating..." : "Create Quiz"}
-              </button>
-            </form>
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
           </div>
-        </div>
+        )}
 
         {loadingQuizzes ? (
           <div className="text-center mt-4">
@@ -333,23 +343,172 @@ function ManageQuestionsPage() {
         ) : (
           <div className="list-group">
             {quizzes.map((quiz) => (
-              <button
+              <div
                 key={quiz._id}
-                className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                onClick={() => handleSelectQuiz(quiz._id)}
+                className="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2"
               >
-                <div>
+                <div className="me-3">
                   <div className="fw-semibold">{quiz.title}</div>
                   {quiz.description && (
                     <small className="text-muted">{quiz.description}</small>
                   )}
                 </div>
-                <span className="badge bg-primary rounded-pill">
-                  {quiz.question?.length || 0} questions
-                </span>
-              </button>
+                <div className="d-flex gap-2 align-items-center">
+                  <span className="badge bg-primary rounded-pill">
+                    {quiz.question?.length || 0} questions
+                  </span>
+                  <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={() => handleSelectQuiz(quiz._id)}
+                  >
+                    Manage
+                  </button>
+                  <button
+                    className="btn btn-outline-warning btn-sm"
+                    onClick={() => openEditQuizModal(quiz)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-outline-danger btn-sm"
+                    onClick={() => openDeleteQuizModal(quiz)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
+        )}
+
+        {showQuizModal && (
+          <>
+            <div
+              className="modal fade show d-block"
+              tabIndex="-1"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-dialog" role="document">
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">
+                      {quizModalMode === "edit" ? "Edit Quiz" : "Add Quiz"}
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      onClick={closeQuizModal}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    <div className="mb-3">
+                      <label className="form-label">Title</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={quizForm.title}
+                        onChange={(e) =>
+                          setQuizForm((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
+                        placeholder="Enter quiz title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="form-label">Description</label>
+                      <textarea
+                        className="form-control"
+                        rows={3}
+                        value={quizForm.description}
+                        onChange={(e) =>
+                          setQuizForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={closeQuizModal}
+                      disabled={quizActionLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSaveQuiz}
+                      disabled={quizActionLoading}
+                    >
+                      {quizActionLoading ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-backdrop fade show" />
+          </>
+        )}
+
+        {showDeleteQuizModal && (
+          <>
+            <div
+              className="modal fade show d-block"
+              tabIndex="-1"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div
+                className="modal-dialog modal-dialog-centered"
+                role="document"
+              >
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">Delete Quiz</h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      onClick={closeDeleteQuizModal}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    Are you sure you want to delete{" "}
+                    <strong>{quizToDelete?.title}</strong>?
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={closeDeleteQuizModal}
+                      disabled={quizActionLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={handleDeleteQuiz}
+                      disabled={quizActionLoading}
+                    >
+                      {quizActionLoading ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-backdrop fade show" />
+          </>
         )}
       </div>
     );
@@ -369,7 +528,6 @@ function ManageQuestionsPage() {
           onClick={() => {
             setSelectedQuiz(null);
             setForm(EMPTY_FORM);
-            setQuizSuccess("");
             setEditingId(null);
             setError("");
             fetchQuizzes();
