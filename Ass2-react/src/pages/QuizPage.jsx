@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import apiClient from "../apiClient";
 import { fetchQuizById, fetchQuizzes } from "../store/slices/quizSlice";
 
 function QuizPage() {
@@ -7,8 +8,20 @@ function QuizPage() {
   const [selectedOption, setSelectedOption] = useState(null);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [quizModalMode, setQuizModalMode] = useState("add");
+  const [quizForm, setQuizForm] = useState({
+    id: "",
+    title: "",
+    description: "",
+  });
+  const [quizToDelete, setQuizToDelete] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
   const dispatch = useDispatch();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const token = useSelector((state) => state.auth.token);
   const { quizzes, selectedQuiz, questions, loading, error } = useSelector(
     (state) => state.quiz,
   );
@@ -62,6 +75,95 @@ function QuizPage() {
     setSelectedOption(null);
   };
 
+  const openAddQuizModal = () => {
+    setQuizModalMode("add");
+    setQuizForm({ id: "", title: "", description: "" });
+    setActionError("");
+    setShowQuizModal(true);
+  };
+
+  const openEditQuizModal = (quiz) => {
+    setQuizModalMode("edit");
+    setQuizForm({
+      id: quiz._id,
+      title: quiz.title || "",
+      description: quiz.description || "",
+    });
+    setActionError("");
+    setShowQuizModal(true);
+  };
+
+  const closeQuizModal = () => {
+    setShowQuizModal(false);
+    setQuizForm({ id: "", title: "", description: "" });
+  };
+
+  const handleSaveQuiz = async () => {
+    if (!quizForm.title.trim()) {
+      setActionError("Quiz title is required.");
+      return;
+    }
+
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const payload = {
+        title: quizForm.title.trim(),
+        description: quizForm.description.trim(),
+      };
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      if (quizModalMode === "edit" && quizForm.id) {
+        await apiClient.put(`/quizzes/${quizForm.id}`, payload, { headers });
+      } else {
+        await apiClient.post("/quizzes", payload, { headers });
+      }
+
+      closeQuizModal();
+      dispatch(fetchQuizzes());
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to save quiz.",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openDeleteModal = (quiz) => {
+    setQuizToDelete(quiz);
+    setActionError("");
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setQuizToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!quizToDelete?._id) return;
+
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      await apiClient.delete(`/quizzes/${quizToDelete._id}`, { headers });
+      closeDeleteModal();
+      dispatch(fetchQuizzes());
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to delete quiz.",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center mt-5">
@@ -106,7 +208,17 @@ function QuizPage() {
   if (!selectedQuiz) {
     return (
       <div className="container mt-4">
-        <h2 className="text-center fw-bold mb-4">Quizzes</h2>
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h2 className="text-center fw-bold mb-0">Quizzes</h2>
+          <button className="btn btn-success" onClick={openAddQuizModal}>
+            Add Quiz
+          </button>
+        </div>
+        {actionError && (
+          <div className="alert alert-danger" role="alert">
+            {actionError}
+          </div>
+        )}
         {quizzes.length === 0 ? (
           <p className="text-center text-muted">No quizzes available.</p>
         ) : (
@@ -125,16 +237,155 @@ function QuizPage() {
                       </small>
                     </p>
                     <button
-                      className="btn btn-primary"
+                      className="btn btn-primary mb-2"
                       onClick={() => handleSelectQuiz(quiz._id)}
                     >
                       Start Quiz
                     </button>
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-outline-warning btn-sm flex-fill"
+                        onClick={() => openEditQuizModal(quiz)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-outline-danger btn-sm flex-fill"
+                        onClick={() => openDeleteModal(quiz)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+        )}
+
+        {showQuizModal && (
+          <>
+            <div
+              className="modal fade show d-block"
+              tabIndex="-1"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-dialog" role="document">
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">
+                      {quizModalMode === "edit" ? "Edit Quiz" : "Add Quiz"}
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      onClick={closeQuizModal}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    <div className="mb-3">
+                      <label className="form-label">Title</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={quizForm.title}
+                        onChange={(e) =>
+                          setQuizForm((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Description</label>
+                      <textarea
+                        className="form-control"
+                        rows={3}
+                        value={quizForm.description}
+                        onChange={(e) =>
+                          setQuizForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={closeQuizModal}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSaveQuiz}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-backdrop fade show" />
+          </>
+        )}
+
+        {showDeleteModal && (
+          <>
+            <div
+              className="modal fade show d-block"
+              tabIndex="-1"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div
+                className="modal-dialog modal-dialog-centered"
+                role="document"
+              >
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">Delete Quiz</h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      onClick={closeDeleteModal}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    Are you sure you want to delete{" "}
+                    <strong>{quizToDelete?.title}</strong>?
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={closeDeleteModal}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={handleConfirmDelete}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-backdrop fade show" />
+          </>
         )}
       </div>
     );
