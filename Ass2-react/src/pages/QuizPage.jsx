@@ -242,20 +242,6 @@ function QuizPage() {
                     >
                       Start Quiz
                     </button>
-                    <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-outline-warning btn-sm flex-fill"
-                        onClick={() => openEditQuizModal(quiz)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-outline-danger btn-sm flex-fill"
-                        onClick={() => openDeleteModal(quiz)}
-                      >
-                        Delete
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
