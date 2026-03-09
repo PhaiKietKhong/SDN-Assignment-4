@@ -32,6 +32,8 @@ function ManageQuestionsPage() {
   const [showDeleteQuizModal, setShowDeleteQuizModal] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState(null);
   const [quizActionLoading, setQuizActionLoading] = useState(false);
+  const [showDeleteQuestionModal, setShowDeleteQuestionModal] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState(null);
 
   // form state (shared for add & edit)
   const [form, setForm] = useState(EMPTY_FORM);
@@ -184,28 +186,44 @@ function ManageQuestionsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /* ── delete question ── */
-  const handleDelete = async (questionId) => {
-    if (!window.confirm("Delete this question?")) return;
+  const openDeleteQuestionModal = (question) => {
+    setQuestionToDelete(question);
     setError("");
+    setShowDeleteQuestionModal(true);
+  };
+
+  const closeDeleteQuestionModal = () => {
+    if (saving) return;
+    setShowDeleteQuestionModal(false);
+    setQuestionToDelete(null);
+  };
+
+  /* ── delete question ── */
+  const handleDelete = async () => {
+    if (!questionToDelete?._id) return;
+    setError("");
+    setSaving(true);
     try {
-      await apiClient.delete(`/questions/${questionId}`, {
+      await apiClient.delete(`/questions/${questionToDelete._id}`, {
         headers: authHeader(),
       });
 
       // remove from quiz
       const updatedQuestionIds = (selectedQuiz.question || [])
         .map((q) => (typeof q === "object" ? q._id : q))
-        .filter((id) => id !== questionId);
+        .filter((id) => id !== questionToDelete._id);
       await apiClient.put(
         `/quizzes/${selectedQuiz._id}`,
         { question: updatedQuestionIds },
         { headers: authHeader() },
       );
 
+      closeDeleteQuestionModal();
       await refreshQuiz();
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to delete question.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -707,7 +725,7 @@ function ManageQuestionsPage() {
                 </button>
                 <button
                   className="btn btn-danger btn-sm"
-                  onClick={() => handleDelete(q._id)}
+                  onClick={() => openDeleteQuestionModal(q)}
                 >
                   Delete
                 </button>
@@ -715,6 +733,53 @@ function ManageQuestionsPage() {
             </div>
           </div>
         ))
+      )}
+
+      {showDeleteQuestionModal && (
+        <>
+          <div
+            className="modal fade show d-block"
+            tabIndex="-1"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Delete Question</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Close"
+                    onClick={closeDeleteQuestionModal}
+                  />
+                </div>
+                <div className="modal-body">
+                  Are you sure you want to delete this question?
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={closeDeleteQuestionModal}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={handleDelete}
+                    disabled={saving}
+                  >
+                    {saving ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" />
+        </>
       )}
     </div>
   );
